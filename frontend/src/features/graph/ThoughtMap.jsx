@@ -140,6 +140,7 @@ export default function ThoughtMap({ session, onError, onSessionRefresh }) {
               onConnect={(c) =>
                 action(() =>
                   api(`/sessions/${session.id}/graph/edges`, "POST", {
+                    expectedRevision: graph.revision,
                     sourceId: c.source,
                     targetId: c.target,
                     type,
@@ -197,6 +198,7 @@ export default function ThoughtMap({ session, onError, onSessionRefresh }) {
                 onClick={() =>
                   action(() =>
                     api(`/sessions/${session.id}/graph/edges`, "POST", {
+                      expectedRevision: graph.revision,
                       sourceId: source,
                       targetId: target,
                       type,
@@ -227,6 +229,7 @@ export default function ThoughtMap({ session, onError, onSessionRefresh }) {
                     action(() =>
                       api(`/sessions/${session.id}/graph/edges`, "POST", {
                         ...e,
+                        expectedRevision: graph.revision,
                         type: event.target.value,
                       }),
                     )
@@ -246,7 +249,7 @@ export default function ThoughtMap({ session, onError, onSessionRefresh }) {
                       api(
                         `/sessions/${session.id}/graph/edges/${e.id}`,
                         "DELETE",
-                        {},
+                        { expectedRevision: graph.revision },
                       ),
                     )
                   }

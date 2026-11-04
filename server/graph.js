@@ -5,13 +5,14 @@ import { complete } from "./llm/client.js";
 import { graphPrompt } from "./llm/prompts.js";
 import { graphOutput, edgeType } from "./schemas.js";
 export async function getGraph(ctx, sid) {
-  const { messages } = await getSession(ctx, sid);
+  const { messages, session } = await getSession(ctx, sid);
   const edges = await all(
     ctx,
     "SELECT * FROM graph_edges WHERE session_id=?",
     sid,
   );
   return {
+    revision: session.revision,
     nodes: messages.filter((m) => m.role === "user" && m.mode === "dialogue"),
     edges: edges.map((e) => ({
       id: e.id,
@@ -34,10 +35,22 @@ async function validateEdge(ctx, sid, e) {
     );
 }
 export async function saveEdge(ctx, sid, e) {
-  const s = await owned(ctx, sid);
+  await owned(ctx, sid);
+  if (!Number.isInteger(e.expectedRevision))
+    throw new AppError("VALIDATION", "사고 지도 버전을 확인해 주세요.");
   await validateEdge(ctx, sid, e);
+  if (
+    e.id &&
+    !(await getGraph(ctx, sid)).edges.some(
+      (edge) =>
+        edge.id === e.id &&
+        edge.sourceId === e.sourceId &&
+        edge.targetId === e.targetId,
+    )
+  )
+    throw conflict();
   const eid = id();
-  await mutate(ctx, sid, s.revision, (t) => [
+  await mutate(ctx, sid, e.expectedRevision, (t) => [
     stmt(
       ctx,
       `DELETE FROM graph_rejections WHERE session_id=? AND source_id=? AND target_id=? AND ${gate}`,
@@ -61,11 +74,13 @@ export async function saveEdge(ctx, sid, e) {
     (x) => x.sourceId === e.sourceId && x.targetId === e.targetId,
   );
 }
-export async function deleteEdge(ctx, sid, eid) {
-  const s = await owned(ctx, sid);
+export async function deleteEdge(ctx, sid, eid, { expectedRevision }) {
+  await owned(ctx, sid);
+  if (!Number.isInteger(expectedRevision))
+    throw new AppError("VALIDATION", "사고 지도 버전을 확인해 주세요.");
   const edge = (await getGraph(ctx, sid)).edges.find((x) => x.id === eid);
   if (!edge) throw new AppError("NOT_FOUND", "관계를 찾을 수 없습니다.", 404);
-  await mutate(ctx, sid, s.revision, (t) => [
+  await mutate(ctx, sid, expectedRevision, (t) => [
     stmt(
       ctx,
       `INSERT OR IGNORE INTO graph_rejections (session_id,source_id,target_id) SELECT ?,?,? WHERE ${gate}`,

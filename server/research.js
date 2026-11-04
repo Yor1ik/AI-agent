@@ -7,6 +7,7 @@ import {
   owned,
   mutate,
   gate,
+  sessionGate,
   gateArgs,
 } from "./db.js";
 import { getSession, insertMessage } from "./sessions.js";
@@ -200,20 +201,25 @@ export async function advanceResearch(ctx, rid, { expectedRevision }) {
         schema: researchOutput,
         search: true,
       });
-      const args = [rid, ctx.ownerId, token, claimedRevision];
-      await stmt(
-        ctx,
-        `INSERT INTO sources (id,step_id,title,url) SELECT json_extract(value,'$.id'),?,json_extract(value,'$.title'),json_extract(value,'$.url') FROM json_each(?) WHERE ${runGate}`,
-        step.id,
-        JSON.stringify(sources),
-        ...args,
-      ).run();
       return await finish(
         ctx,
         r,
         token,
         claimedRevision,
         (a) => [
+          stmt(
+            ctx,
+            `DELETE FROM sources WHERE step_id=? AND ${runGate}`,
+            step.id,
+            ...a,
+          ),
+          stmt(
+            ctx,
+            `INSERT INTO sources (id,step_id,title,url) SELECT json_extract(value,'$.id'),?,json_extract(value,'$.title'),json_extract(value,'$.url') FROM json_each(?) WHERE ${runGate}`,
+            step.id,
+            JSON.stringify(sources),
+            ...a,
+          ),
           stmt(
             ctx,
             `UPDATE research_steps SET status='completed',result=?,uncertainties=?,error=NULL WHERE id=? AND ${runGate}`,
@@ -408,7 +414,7 @@ export async function followup(
       }),
       stmt(
         ctx,
-        `UPDATE sessions SET busy_token=? WHERE ${gate}`,
+        `UPDATE sessions SET busy_token=? WHERE ${sessionGate}`,
         token,
         ...gateArgs(ctx, sid, t),
       ),
@@ -453,7 +459,7 @@ export async function followup(
         }),
         stmt(
           ctx,
-          `UPDATE sessions SET busy_token=NULL WHERE ${gate}`,
+          `UPDATE sessions SET busy_token=NULL WHERE ${sessionGate}`,
           ...gateArgs(ctx, sid, t),
         ),
       ],

@@ -1,4 +1,4 @@
-import { id, owned, mutate, stmt, gate, gateArgs } from "./db.js";
+import { id, owned, mutate, stmt, gate, sessionGate, gateArgs } from "./db.js";
 import { getSession, insertMessage } from "./sessions.js";
 import { AppError } from "./errors.js";
 import { complete } from "./llm/client.js";
@@ -26,7 +26,7 @@ export async function sendMessage(ctx, sid, { content, expectedRevision }) {
       insertMessage(ctx, sid, t, { role: "user", content }),
       stmt(
         ctx,
-        `UPDATE sessions SET busy_token=?,title=CASE WHEN title='새로운 생각' THEN ? ELSE title END WHERE ${gate}`,
+        `UPDATE sessions SET busy_token=?,title=CASE WHEN title='새로운 생각' THEN ? ELSE title END WHERE ${sessionGate}`,
         token,
         content.slice(0, 32),
         ...gateArgs(ctx, sid, t),
@@ -57,7 +57,7 @@ export async function sendMessage(ctx, sid, { content, expectedRevision }) {
         insertMessage(ctx, sid, t, { role: "assistant", content: answer.text }),
         stmt(
           ctx,
-          `UPDATE sessions SET busy_token=NULL WHERE ${gate}`,
+          `UPDATE sessions SET busy_token=NULL WHERE ${sessionGate}`,
           ...gateArgs(ctx, sid, t),
         ),
       ],
@@ -84,7 +84,7 @@ export async function regenerate(ctx, sid, { messageId, expectedRevision }) {
     (t) => [
       stmt(
         ctx,
-        `UPDATE sessions SET busy_token=? WHERE ${gate}`,
+        `UPDATE sessions SET busy_token=? WHERE ${sessionGate}`,
         token,
         ...gateArgs(ctx, sid, t),
       ),
@@ -139,7 +139,7 @@ export async function regenerate(ctx, sid, { messageId, expectedRevision }) {
         ),
         stmt(
           ctx,
-          `UPDATE sessions SET busy_token=NULL WHERE ${gate}`,
+          `UPDATE sessions SET busy_token=NULL WHERE ${sessionGate}`,
           ...gateArgs(ctx, sid, t),
         ),
       ],
@@ -156,7 +156,7 @@ export async function cancelGeneration(ctx, sid, { expectedRevision }) {
   await mutate(ctx, sid, expectedRevision, (t) => [
     stmt(
       ctx,
-      `UPDATE sessions SET busy_token=NULL,graph_busy_token=NULL WHERE ${gate}`,
+      `UPDATE sessions SET busy_token=NULL,graph_busy_token=NULL WHERE ${sessionGate}`,
       ...gateArgs(ctx, sid, t),
     ),
   ]);
@@ -175,7 +175,7 @@ export async function continueDialogue(ctx, sid, { expectedRevision }) {
     (t) => [
       stmt(
         ctx,
-        `UPDATE sessions SET busy_token=? WHERE ${gate}`,
+        `UPDATE sessions SET busy_token=? WHERE ${sessionGate}`,
         token,
         ...gateArgs(ctx, sid, t),
       ),
@@ -202,7 +202,7 @@ export async function continueDialogue(ctx, sid, { expectedRevision }) {
         insertMessage(ctx, sid, t, { role: "assistant", content: answer.text }),
         stmt(
           ctx,
-          `UPDATE sessions SET busy_token=NULL WHERE ${gate}`,
+          `UPDATE sessions SET busy_token=NULL WHERE ${sessionGate}`,
           ...gateArgs(ctx, sid, t),
         ),
       ],

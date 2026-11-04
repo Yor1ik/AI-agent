@@ -102,3 +102,31 @@ it("retries an unanswered user message without duplicating it", async () => {
     "이어지는 질문",
   ]);
 });
+it("separate sessions keep independent titles and generation locks", async () => {
+  const other = await createSession(f.ctx);
+  let resolveB, started;
+  const ready = new Promise((r) => (started = r));
+  f.ctx.fetchImpl = async (u, o) => {
+    const p = JSON.parse(o.body);
+    if (p.messages.at(-1).content === "B의 생각") {
+      started();
+      return new Promise((r) => (resolveB = r));
+    }
+    return response({ text: "A의 질문" });
+  };
+  const pendingB = sendMessage(f.ctx, other.id, {
+    content: "B의 생각",
+    expectedRevision: 0,
+  });
+  await ready;
+  const resultA = await sendMessage(f.ctx, s.id, {
+    content: "A의 생각",
+    expectedRevision: 0,
+  });
+  expect(resultA.session.title).toBe("A의 생각");
+  const currentB = await getSession(f.ctx, other.id);
+  expect(currentB.session.title).toBe("B의 생각");
+  expect(currentB.session.busy).toBe(true);
+  resolveB(response({ text: "B의 질문" }));
+  expect((await pendingB).messages.at(-1).content).toBe("B의 질문");
+});

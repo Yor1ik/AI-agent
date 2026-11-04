@@ -60,7 +60,16 @@ test.beforeEach(async ({ page }) => {
     } else if (path.endsWith("/impact"))
       output = {
         revision: session.revision,
-        affected: { messages: messages.length - 1, research: 0, relations: 0 },
+        affected: {
+          messages: messages.filter(
+            (message) =>
+              message.position >
+              (messages.find((m) => m.id === path.split("/").at(-2))
+                ?.position ?? -1),
+          ).length,
+          research: run ? 1 : 0,
+          relations: 0,
+        },
       };
     else if (path.includes("/messages/") && method === "PATCH") {
       messages = [{ ...messages[0], content: data.content }];
@@ -246,4 +255,106 @@ test("renders unsafe Markdown as inert content and provides code copying", async
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
     "const answer = 42;",
   );
+});
+test("regeneration confirms research deletion even without later messages", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("내 생각 입력").fill("진로 고민");
+  await page.getByRole("button", { name: "생각 보내기" }).click();
+  await expect(page.getByText("어떤 경험에서 그렇게 느꼈나요?")).toBeVisible();
+  await page.getByRole("button", { name: "탐색", exact: true }).click();
+  await page.getByLabel("탐색할 내용").fill("직무 조사");
+  await page.getByRole("button", { name: "질문 나누기" }).click();
+  await expect(page.getByText("실제 업무는?")).toBeVisible();
+  await page.getByRole("button", { name: "문답으로 돌아가기" }).click();
+  await page.getByRole("button", { name: "질문 다시 생성" }).click();
+  await expect(page.getByRole("dialog")).toBeVisible({ timeout: 1500 });
+  await expect(page.getByRole("dialog")).toContainText("탐색 1개");
+  await page.getByRole("button", { name: "취소", exact: true }).click();
+  await expect(page.getByText("어떤 경험에서 그렇게 느꼈나요?")).toBeVisible();
+});
+test("initiating research tab displays persisted active stage while search is pending", async ({
+  page,
+}) => {
+  let phase = 0,
+    release;
+  const held = new Promise((r) => (release = r));
+  let state = {
+    id: "r1",
+    sessionId: "session-one",
+    declaration: "직무 조사",
+    status: "ready",
+    revision: 2,
+    steps: [
+      {
+        id: "step1",
+        position: 0,
+        question: "실제 업무는?",
+        status: "pending",
+        sources: [],
+        uncertainties: [],
+      },
+    ],
+  };
+  await page.route("**/api/research/r1", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(state),
+    }),
+  );
+  await page.route("**/api/research/r1/advance", async (route) => {
+    phase++;
+    if (phase === 2) {
+      state = {
+        ...state,
+        status: "researching",
+        revision: 3,
+        activeStepId: "step1",
+      };
+      await held;
+      state = {
+        ...state,
+        status: "ready",
+        revision: 4,
+        activeStepId: null,
+        steps: [
+          {
+            ...state.steps[0],
+            status: "completed",
+            result: "확인한 업무",
+            sources: [
+              { id: "src", url: "https://example.org", title: "공식 자료" },
+            ],
+          },
+        ],
+      };
+    } else if (phase === 3)
+      state = {
+        ...state,
+        status: "completed",
+        revision: 6,
+        result: { answer: "종합 결과", uncertainties: [], sourceIds: ["src"] },
+      };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(state),
+    });
+  });
+  await page.goto("/");
+  await page.getByRole("button", { name: "탐색", exact: true }).click();
+  await page.getByLabel("탐색할 내용").fill("직무 조사");
+  await page.getByRole("button", { name: "질문 나누기" }).click();
+  await expect(page.getByText("실제 업무는?")).toBeVisible();
+  await page.getByRole("button", { name: "자료 조사 시작" }).click();
+  try {
+    await expect(page.getByText("검색·분석 중", { exact: true })).toBeVisible({
+      timeout: 4500,
+    });
+  } finally {
+    release();
+  }
+  await expect(page.getByRole("heading", { name: "탐색 결과" })).toBeVisible();
 });

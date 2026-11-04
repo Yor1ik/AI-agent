@@ -15,6 +15,7 @@ export async function owned(ctx, sessionId) {
   if (!s) throw new AppError("NOT_FOUND", "대화를 찾을 수 없습니다.", 404);
   return s;
 }
+export const sessionGate = "id=? AND owner_id=? AND last_mutation_id=?";
 export const gate =
   "EXISTS (SELECT 1 FROM sessions WHERE id=? AND owner_id=? AND last_mutation_id=?)";
 export async function mutate(

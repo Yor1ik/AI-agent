@@ -187,24 +187,20 @@ export default function App() {
     }
   }
   async function regenerate(m) {
+    const sid = session.id;
+    const impact = await api(`/sessions/${sid}/messages/${m.id}/impact`);
     const execute = () =>
       action(async () =>
         apply(
-          await api(
-            `/sessions/${session.id}/messages/${m.id}/regenerate`,
-            "POST",
-            { expectedRevision: session.revision },
-          ),
+          await api(`/sessions/${sid}/messages/${m.id}/regenerate`, "POST", {
+            expectedRevision: impact.revision,
+          }),
         ),
       );
-    const suffix = messages.filter((x) => x.position > m.position);
-    if (suffix.length) {
-      const impact = await api(
-        `/sessions/${session.id}/messages/${m.id}/impact`,
-      );
+    if (impact.affected.messages || impact.affected.research) {
       setConfirm({
         title: "이 질문부터 다시 이어갈까요?",
-        description: `성공하면 이후 메시지 ${suffix.length}개와 관련 탐색 ${impact.affected.research}개가 삭제됩니다. 실패하면 기존 질문과 기록은 유지됩니다.`,
+        description: `성공하면 이후 메시지 ${impact.affected.messages}개와 관련 탐색 ${impact.affected.research}개가 삭제됩니다. 실패하면 기존 질문과 기록은 유지됩니다.`,
         execute,
       });
     } else await execute();

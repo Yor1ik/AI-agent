@@ -7,6 +7,7 @@ import {
   owned,
   mutate,
   gate,
+  sessionGate,
   gateArgs,
 } from "./db.js";
 import { AppError, conflict } from "./errors.js";
@@ -189,7 +190,7 @@ export async function editMessage(
     ),
     stmt(
       ctx,
-      `UPDATE sessions SET busy_token=NULL WHERE ${gate}`,
+      `UPDATE sessions SET busy_token=NULL WHERE ${sessionGate}`,
       ...gateArgs(ctx, sid, t),
     ),
   ]);
@@ -213,7 +214,7 @@ export async function setSessionStatus(ctx, sid, { status, expectedRevision }) {
   await mutate(ctx, sid, expectedRevision, (t) => [
     stmt(
       ctx,
-      `UPDATE sessions SET status=?,busy_token=NULL WHERE ${gate}`,
+      `UPDATE sessions SET status=?,busy_token=NULL WHERE ${sessionGate}`,
       status,
       ...gateArgs(ctx, sid, t),
     ),

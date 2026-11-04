@@ -145,16 +145,18 @@ export async function handleApi(request, env, options = {}) {
               sid,
               parse(
                 z.object({
+                  id: z.string().optional(),
                   sourceId: z.string(),
                   targetId: z.string(),
                   type: edgeType,
+                  expectedRevision: revision,
                 }),
                 data,
               ),
             ),
           );
         if (mid === "edges" && sub && method === "DELETE") {
-          await deleteEdge(ctx, sid, sub);
+          await deleteEdge(ctx, sid, sub, parse(rev, data));
           return json({ ok: true });
         }
       }

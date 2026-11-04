@@ -79,3 +79,15 @@ it("deletes a session without deleting another", async () => {
   await deleteSession(f.ctx, a.id, 0);
   expect((await listSessions(f.ctx)).map((s) => s.id)).toEqual([b.id]);
 });
+it("pausing one session never changes another session without its revision", async () => {
+  const { setSessionStatus } = await import("../server/sessions.js");
+  const a = await createSession(f.ctx),
+    b = await createSession(f.ctx);
+  await setSessionStatus(f.ctx, a.id, {
+    status: "paused",
+    expectedRevision: 0,
+  });
+  const other = (await getSession(f.ctx, b.id)).session;
+  expect(other.status).toBe("active");
+  expect(other.revision).toBe(0);
+});

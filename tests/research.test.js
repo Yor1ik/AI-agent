@@ -162,3 +162,45 @@ it("stops the pipeline on provider rate limits instead of consuming remaining ca
   expect(r.steps[1].status).toBe("pending");
   expect(calls).toBe(2);
 });
+it("pause before step commit leaves no obsolete citations and resume replaces the source set", async () => {
+  const { resumeResearch } = await import("../server/research.js");
+  f.ctx.fetchImpl = async () => response({ questions: ["하위 질문"] });
+  let r = await createResearch(f.ctx, s.id, {
+    declaration: "대상",
+    expectedRevision: 0,
+  });
+  r = await advanceResearch(f.ctx, r.id, { expectedRevision: 0 });
+  const real = f.ctx.db;
+  f.ctx.fetchImpl = async () =>
+    response({ answer: "폐기될 응답", uncertainties: [] }, [
+      {
+        type: "url_citation",
+        url_citation: { url: "https://example.org/old", title: "이전 자료" },
+      },
+    ]);
+  f.ctx.db = {
+    prepare: (...args) => real.prepare(...args),
+    batch: async (statements) => {
+      await pauseResearch({ ...f.ctx, db: real }, r.id);
+      return real.batch(statements);
+    },
+  };
+  await expect(
+    advanceResearch(f.ctx, r.id, { expectedRevision: r.revision }),
+  ).rejects.toMatchObject({ status: 409 });
+  f.ctx.db = real;
+  r = await getResearch(f.ctx, r.id);
+  expect(r.steps[0].sources).toHaveLength(0);
+  r = await resumeResearch(f.ctx, r.id, { expectedRevision: r.revision });
+  f.ctx.fetchImpl = async () =>
+    response({ answer: "새 응답", uncertainties: [] }, [
+      {
+        type: "url_citation",
+        url_citation: { url: "https://example.org/new", title: "새 자료" },
+      },
+    ]);
+  r = await advanceResearch(f.ctx, r.id, { expectedRevision: r.revision });
+  expect(r.steps[0].sources.map((x) => x.url)).toEqual([
+    "https://example.org/new",
+  ]);
+});

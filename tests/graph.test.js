@@ -36,10 +36,16 @@ it("preserves user edits and deleted edges during regeneration", async () => {
     response({ edges: [{ sourceId: a, targetId: b, type: "근거" }] });
   let g = await refreshGraph(f.ctx, s.id, { expectedRevision: 2, force: true });
   expect(g.edges[0].type).toBe("근거");
-  await saveEdge(f.ctx, s.id, { sourceId: a, targetId: b, type: "예시" });
+  await saveEdge(f.ctx, s.id, {
+    id: g.edges[0].id,
+    sourceId: a,
+    targetId: b,
+    type: "예시",
+    expectedRevision: 2,
+  });
   g = await refreshGraph(f.ctx, s.id, { expectedRevision: 3, force: true });
   expect(g.edges[0].type).toBe("예시");
-  await deleteEdge(f.ctx, s.id, g.edges[0].id);
+  await deleteEdge(f.ctx, s.id, g.edges[0].id, { expectedRevision: 3 });
   g = await refreshGraph(f.ctx, s.id, { expectedRevision: 4, force: true });
   expect(g.edges).toHaveLength(0);
 });
@@ -52,10 +58,20 @@ it("rejects foreign-session nodes and invalid types", async () => {
   });
   const foreign = (await getSession(f.ctx, other.id)).messages[0].id;
   await expect(
-    saveEdge(f.ctx, s.id, { sourceId: a, targetId: foreign, type: "근거" }),
+    saveEdge(f.ctx, s.id, {
+      sourceId: a,
+      targetId: foreign,
+      type: "근거",
+      expectedRevision: 2,
+    }),
   ).rejects.toMatchObject({ status: 400 });
   await expect(
-    saveEdge(f.ctx, s.id, { sourceId: a, targetId: b, type: "진단" }),
+    saveEdge(f.ctx, s.id, {
+      sourceId: a,
+      targetId: b,
+      type: "진단",
+      expectedRevision: 2,
+    }),
   ).rejects.toMatchObject({ status: 400 });
 });
 it("uses saved graph when no messages changed", async () => {
@@ -94,5 +110,26 @@ it("can cancel a disconnected graph request and discard its late proposal", asyn
   ).resolves.toMatchObject({ edges: [] });
   resolve(response({ edges: [{ sourceId: a, targetId: b, type: "근거" }] }));
   await expect(pending).rejects.toMatchObject({ status: 409 });
+  expect((await getGraph(f.ctx, s.id)).edges).toHaveLength(0);
+});
+it("rejects stale graph edits instead of resurrecting a deleted relationship", async () => {
+  const initial = await getGraph(f.ctx, s.id);
+  const edge = await saveEdge(f.ctx, s.id, {
+    sourceId: a,
+    targetId: b,
+    type: "근거",
+    expectedRevision: initial.revision,
+  });
+  const beforeDelete = await getGraph(f.ctx, s.id);
+  await deleteEdge(f.ctx, s.id, edge.id, {
+    expectedRevision: beforeDelete.revision,
+  });
+  await expect(
+    saveEdge(f.ctx, s.id, {
+      ...edge,
+      type: "예시",
+      expectedRevision: beforeDelete.revision,
+    }),
+  ).rejects.toMatchObject({ status: 409 });
   expect((await getGraph(f.ctx, s.id)).edges).toHaveLength(0);
 });

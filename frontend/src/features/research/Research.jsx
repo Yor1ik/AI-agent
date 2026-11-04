@@ -45,6 +45,12 @@ export default function Research({
     runRef = useRef(null),
     mounted = useRef(true);
   const setCurrent = (r) => {
+    if (
+      r &&
+      runRef.current?.id === r.id &&
+      r.revision < runRef.current.revision
+    )
+      return;
     runRef.current = r;
     if (mounted.current) setRun(r);
   };
@@ -73,19 +79,21 @@ export default function Research({
   useEffect(() => {
     if (
       !run ||
-      !["decomposing", "researching", "synthesizing"].includes(run.status)
+      (!busy &&
+        !["decomposing", "researching", "synthesizing"].includes(run.status))
     )
       return;
     const timer = setInterval(async () => {
-      if (document.hidden || drive.current) return;
+      if (document.hidden) return;
       try {
-        setCurrent(await api(`/research/${run.id}`));
+        const next = await api(`/research/${run.id}`);
+        if (mounted.current && runRef.current?.id === run.id) setCurrent(next);
       } catch (e) {
         onError(e);
       }
-    }, 5000);
+    }, 2000);
     return () => clearInterval(timer);
-  }, [run?.id, run?.status]);
+  }, [run?.id, run?.status, busy]);
   async function task(fn) {
     if (busy) return;
     setBusy(true);
