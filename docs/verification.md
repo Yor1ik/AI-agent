@@ -42,7 +42,7 @@
 4. Production·Preview·대체 호스트의 Access 보호와 issuer/audience/허용 이메일. 서버 인증은 설정 누락 시 거부합니다.
 5. 실계정으로 문답 품질·중립성과 실제 검색 출처, 운영 D1 복구를 확인해야 합니다.
 
-현재 대화 기록·키·운영 데이터는 Git에 넣지 않았습니다. GitHub push·원격 배포·새 환경 게시도 수행하지 않았습니다.
+대화 기록·키·운영 데이터는 Git에 넣지 않았습니다. 이후 사용자 요청으로 구현을 GitHub socratic-explorer-preview 브랜치에 push했습니다. main은 기존 템플릿 상태이며 Cloudflare 배포 URL·운영 적용·새 환경 게시 성공은 확인하지 못했습니다. 최신 진행 상태는 루트 HANDOFF.md를 참고하세요.
 
 ## 구현 결정
 
