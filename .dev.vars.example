@@ -1,0 +1,11 @@
+# 로컬에서 .dev.vars로 복사. 실제 값은 Git에 올리지 마세요.
+ENVIRONMENT=local
+LOCAL_DEV=true
+OPENROUTER_API_KEY=
+# 공식 모델 목록에서 확인한 :free 고정 모델 ID. openrouter/free 사용 금지.
+LLM_MODEL=
+SEARCH_ENABLED=true
+# 배포 환경에서는 ENVIRONMENT=production, LOCAL_DEV=false 사용
+ACCESS_ISSUER=
+ACCESS_AUDIENCE=
+ALLOWED_EMAIL=

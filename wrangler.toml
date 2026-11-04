@@ -1,8 +1,15 @@
-# Cloudflare Pages 설정. 보통은 손댈 일이 없습니다.
 name = "ai-for-someone"
-pages_build_output_dir = "public"
-compatibility_date = "2026-11-03"
+pages_build_output_dir = "dist"
+compatibility_date = "2026-07-30"
 
-# AI 바인딩. 이것 덕분에 API 키를 코드에 적지 않습니다.
-[ai]
-binding = "AI"
+[vars]
+ENVIRONMENT = "production"
+LOCAL_DEV = "false"
+SEARCH_ENABLED = "true"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "socratic-explorer"
+# 생성한 실제 D1 ID로 바꾸세요. 이 ID는 로컬 개발용 자리표시자입니다.
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "migrations"

@@ -1,0 +1,14 @@
+PRAGMA foreign_keys = ON;
+CREATE TABLE sessions (id TEXT PRIMARY KEY, owner_id TEXT NOT NULL, title TEXT NOT NULL DEFAULT '새로운 생각', revision INTEGER NOT NULL DEFAULT 0, status TEXT NOT NULL DEFAULT 'active', busy_token TEXT, llm_attempts INTEGER NOT NULL DEFAULT 0, graph_revision INTEGER NOT NULL DEFAULT -1, graph_signature TEXT, graph_busy_token TEXT, last_mutation_id TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
+CREATE INDEX sessions_owner ON sessions(owner_id, updated_at);
+CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, position INTEGER NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, mode TEXT NOT NULL DEFAULT 'dialogue', research_run_id TEXT, created_at TEXT NOT NULL);
+CREATE INDEX messages_order ON messages(session_id, position);
+CREATE TABLE research_runs (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, declaration TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', revision INTEGER NOT NULL DEFAULT 0, active_step_id TEXT, active_token TEXT, base_position INTEGER NOT NULL, result TEXT, error TEXT, created_at TEXT NOT NULL);
+CREATE INDEX runs_session ON research_runs(session_id);
+CREATE TABLE research_steps (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES research_runs(id) ON DELETE CASCADE, position INTEGER NOT NULL, question TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'pending', result TEXT, uncertainties TEXT, error TEXT);
+CREATE INDEX steps_run ON research_steps(run_id, position);
+CREATE TABLE sources (id TEXT PRIMARY KEY, step_id TEXT NOT NULL REFERENCES research_steps(id) ON DELETE CASCADE, title TEXT NOT NULL, url TEXT NOT NULL);
+CREATE INDEX sources_step ON sources(step_id);
+CREATE TABLE graph_edges (id TEXT PRIMARY KEY, session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, source_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, target_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, type TEXT NOT NULL, user_edited INTEGER NOT NULL DEFAULT 0, UNIQUE(session_id,source_id,target_id));
+CREATE INDEX edges_session ON graph_edges(session_id);
+CREATE TABLE graph_rejections (session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE, source_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, target_id TEXT NOT NULL REFERENCES messages(id) ON DELETE CASCADE, PRIMARY KEY(session_id,source_id,target_id));
